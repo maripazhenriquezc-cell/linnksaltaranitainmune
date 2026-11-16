@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cruce Inmunitario - Modo Progreso</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@600;700&display=swap');
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #0c0a1d;
+            color: #f0f0f0;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+        }
+
+        .font-arcade {
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        .arcade-container {
+            position: relative;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.9);
+        }
+
+        .btn-retro {
+            background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+            border: 2px solid #7dd3fc;
+            box-shadow: 0 4px 0 #0369a1, 0 0 10px rgba(56, 189, 248, 0.4);
+            transition: all 0.1s ease;
+        }
+
+        .btn-retro:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #0369a1;
+        }
+
+        .btn-dir {
+            background: rgba(30, 41, 59, 0.9);
+            border: 2px solid #38bdf8;
+            box-shadow: 0 4px 0 #0f172a, 0 0 8px rgba(56, 189, 248, 0.3);
+        }
+
+        .btn-dir:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #0f172a;
+            background: rgba(51, 65, 85, 1);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+    <!-- Contenedor Principal del Juego -->
+    <div class="w-full max-w-lg flex flex-col items-center">
+
+        <!-- Cabecera -->
+        <div class="w-full text-center mb-2 flex items-center justify-between px-2">
+            <div>
+                <h1 class="text-lg sm:text-xl font-bold tracking-wider text-cyan-400 font-arcade drop-shadow-[0_0_8px_rgba(56,189,248,0.8)]">
+                    CRUCE INMUNITARIO
+                </h1>
+                <p id="diffBadge" class="text-xs text-emerald-400 font-semibold tracking-widest">MAPA 1: HERIDA SUPERFICIAL</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="soundToggleBtn" class="bg-indigo-950 border border-indigo-500 text-indigo-300 px-2 py-1 rounded-lg text-[10px] font-arcade hover:bg-indigo-900">
+                    🔊 ON
+                </button>
+            </div>
+        </div>
+
+        <!-- Barra de Estado (HUD) -->
+        <div class="w-full bg-slate-900 border-2 border-cyan-500/40 rounded-t-xl p-2 sm:p-3 flex justify-between items-center text-xs sm:text-sm font-arcade">
+            <div class="flex flex-col">
+                <span class="text-gray-400 text-[10px]">NIVEL</span>
+                <span id="levelText" class="text-cyan-300 text-base">1</span>
+            </div>
+            <div class="flex flex-col items-center">
+                <span class="text-gray-400 text-[10px]">PUNTOS</span>
+                <span id="scoreText" class="text-yellow-400 text-base">0000</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-gray-400 text-[10px]">VIDAS</span>
+                <div id="livesHUD" class="text-pink-400 text-base">💜 💜 💜</div>
+            </div>
+        </div>
+
+        <!-- Contenedor del Lienzo (Canvas) -->
+        <div class="arcade-container w-full aspect-[4/3] bg-black border-x-2 border-b-2 border-cyan-500/40 rounded-b-xl relative overflow-hidden">
+            <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+            <!-- Pantalla Modal Dinámica -->
+            <div id="overlayScreen" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30">
+                <div id="overlayContent" class="max-w-md flex flex-col items-center">
+                    <!-- Contenido insertado por JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Controles -->
+        <div class="w-full mt-3 flex justify-between items-center px-2">
+            <!-- Cruceta Táctil para Móviles -->
+            <div class="grid grid-cols-3 gap-2 w-44">
+                <div></div>
+                <button id="btnUp" class="btn-dir w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold text-cyan-300">▲</button>
+                <div></div>
+                <button id="btnLeft" class="btn-dir w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold text-cyan-300">◄</button>
+                <button id="btnDown" class="btn-dir w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold text-cyan-300">▼</button>
+                <button id="btnRight" class="btn-dir w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold text-cyan-300">►</button>
+            </div>
+
+            <!-- Información en Pantalla -->
+            <div class="text-right flex flex-col gap-1 text-xs text-gray-300">
+                <div class="bg-slate-900/90 border border-slate-700 p-3 rounded-xl max-w-[170px]">
+                    <p class="text-cyan-400 font-bold mb-1">🎮 OBJETIVO:</p>
+                    <p class="text-[11px] text-gray-300 leading-snug">Llega a los 3 nódulos arriba para avanzar.</p>
+                    <p class="text-[10px] text-yellow-400 mt-1 font-semibold">¡Desafío progresivo!</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Motor del Juego en JavaScript -->
+    <script>
+        // --- Sintetizador de Audio Web ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+            }
+
+            playJump() {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(540, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.08);
+            }
+
+            playHit() {
+                if (!this.enabled || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playDock() {
+                if (!this.enabled || !this.ctx) return;
+                const notes = [523.25, 659.25, 783.99];
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.08);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime + i * 0.08);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.08 + 0.12);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + i * 0.08);
+                    osc.stop(this.ctx.currentTime + i * 0.08 + 0.12);
+                });
+            }
+
+            playLevelUp() {
+                if (!this.enabled || !this.ctx) return;
+                const notes = [440, 554.37, 659.25, 880, 1046.50];
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.09);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime + i * 0.09);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.09 + 0.18);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(this.ctx.currentTime + i * 0.09);
+                    osc.stop(this.ctx.currentTime + i * 0.09 + 0.18);
+                });
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // --- Configuración del Juego ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlayScreen = document.getElementById('overlayScreen');
+        const overlayContent = document.getElementById('overlayContent');
+
+        const COLS = 9;
+        const ROWS = 7;
+
+        let tileW = 0;
+        let tileH = 0;
+
+        let gameState = 'START';
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('immuneHighScore')) || 0;
+        let level = 1;
+        let lives = 3;
+        let highestRowReached = ROWS - 1;
+        let particles = [];
+        let lanes = [];
+        let currentMapIndex = 0;
+
+        // Definición de los 4 Mapas Distintos
+        const MAPS = [
+            {
+                name: "MAPA 1: HERIDA SUPERFICIAL",
+                themeColor: "#10b981",
+                bgRoad: "#1e1b2e",
+                bgRiver: "#042f2e",
+                rows: ['GOAL', 'RIVER', 'RIVER', 'SAFE', 'ROAD', 'ROAD', 'START']
+            },
+            {
+                name: "MAPA 2: TORRENTE SANGUÍNEO",
+                themeColor: "#38bdf8",
+                bgRoad: "#1e293b",
+                bgRiver: "#082f49",
+                rows: ['GOAL', 'RIVER', 'RIVER', 'RIVER', 'SAFE', 'ROAD', 'START']
+            },
+            {
+                name: "MAPA 3: TEJIDO INFESTADO",
+                themeColor: "#f43f5e",
+                bgRoad: "#2a121b",
+                bgRiver: "#1e1b4b",
+                rows: ['GOAL', 'RIVER', 'SAFE', 'ROAD', 'ROAD', 'ROAD', 'START']
+            },
+            {
+                name: "MAPA 4: VÍA CELULAR",
+                themeColor: "#c084fc",
+                bgRoad: "#1f1635",
+                bgRiver: "#0f293a",
+                rows: ['GOAL', 'RIVER', 'ROAD', 'SAFE', 'RIVER', 'ROAD', 'START']
+            }
+        ];
+
+        const player = {
+            col: 4,
+            row: 6,
+            x: 0,
+            y: 0,
+            targetX: 0,
+            targetY: 0,
+            invulnerable: 0,
+            pulse: 0
+        };
+
+        const goalSlots = [
+            { col: 1, occupied: false },
+            { col: 4, occupied: false },
+            { col: 7, occupied: false }
+        ];
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            tileW = canvas.width / COLS;
+            tileH = canvas.height / ROWS;
+            player.x = player.col * tileW + tileW / 2;
+            player.y = player.row * tileH + tileH / 2;
+            player.targetX = player.x;
+            player.targetY = player.y;
+        }
+
+        function updateHUD() {
+            document.getElementById('levelText').innerText = level;
+            document.getElementById('scoreText').innerText = score.toString().padStart(4, '0');
+            const map = MAPS[currentMapIndex];
+            const diffBadge = document.getElementById('diffBadge');
+            diffBadge.innerText = map.name;
+            diffBadge.style.color = map.themeColor;
+
+            const hearts = [];
+            for (let i = 0; i < 3; i++) {
+                hearts.push(i < lives ? '💜' : '🖤');
+            }
+            document.getElementById('livesHUD').innerText = hearts.join(' ');
+        }
+
+        function initLanes() {
+            lanes = [];
+            currentMapIndex = (level - 1) % MAPS.length;
+            const currentMap = MAPS[currentMapIndex];
+
+            // Progresión rápida y desafiante (+35% de velocidad por nivel)
+            const baseSpeedMult = 1.35 + (level - 1) * 0.35;
+            const extraObstacles = level >= 2 ? 1 : 0;
+
+            for (let r = 0; r < ROWS; r++) {
+                const rowType = currentMap.rows[r];
+                if (rowType === 'ROAD') {
+                    const dir = (r % 2 === 0) ? 1 : -1;
+                    const speed = (1.1 + (r % 2) * 0.35) * baseSpeedMult * dir;
+                    const count = 3 + extraObstacles;
+                    const items = [];
+                    const spacing = COLS / count;
+
+                    for (let i = 0; i < count; i++) {
+                        items.push({
+                            x: (i * spacing + (r * 0.35)) * tileW,
+                            width: tileW * 1.15,
+                            type: level >= 3 ? 'NEUTROPHIL' : 'BACTERIA',
+                            hue: level >= 3 ? 345 : (level === 2 ? 280 : 140)
+                        });
+                    }
+                    lanes.push({ row: r, type: 'ROAD', speed, items });
+                } else if (rowType === 'RIVER') {
+                    const dir = (r % 2 === 0) ? -1 : 1;
+                    const speed = (0.95 + (r % 3) * 0.25) * baseSpeedMult * dir;
+                    const count = 3;
+                    const items = [];
+                    const spacing = COLS / count;
+                    // Balsas más estrechas a medida que sube el nivel
+                    const raftWidth = Math.max(1.25, 1.8 - (level - 1) * 0.12);
+
+                    for (let i = 0; i < count; i++) {
+                        items.push({
+                            x: (i * spacing + (r * 0.45)) * tileW,
+                            width: tileW * raftWidth,
+                            type: 'RAFT'
+                        });
+                    }
+                    lanes.push({ row: r, type: 'RIVER', speed, items });
+                } else {
+                    lanes.push({ row: r, type: rowType, speed: 0, items: [] });
+                }
+            }
+            updateHUD();
+        }
+
+        function resetPlayer() {
+            player.col = 4;
+            player.row = ROWS - 1;
+            player.targetX = player.col * tileW + tileW / 2;
+            player.targetY = player.row * tileH + tileH / 2;
+            player.x = player.targetX;
+            player.y = player.targetY;
+            player.invulnerable = 45;
+            highestRowReached = ROWS - 1;
+        }
+
+        function createExplosion(x, y, color, count = 18) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                particles.push({
+                    x,
+                    y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function movePlayer(dCol, dRow) {
+            if (gameState !== 'PLAYING') return;
+            sound.init();
+
+            const newCol = player.col + dCol;
+            const newRow = player.row + dRow;
+
+            if (newCol >= 0 && newCol < COLS && newRow >= 0 && newRow < ROWS) {
+                player.col = newCol;
+                player.row = newRow;
+                player.targetX = player.col * tileW + tileW / 2;
+                player.targetY = player.row * tileH + tileH / 2;
+                sound.playJump();
+
+                if (newRow < highestRowReached) {
+                    score += 10 * level;
+                    highestRowReached = newRow;
+                    updateHUD();
+                }
+
+                if (newRow === 0) {
+                    checkGoalReached();
+                }
+            }
+        }
+
+        function checkGoalReached() {
+            let landedSlot = null;
+            for (const slot of goalSlots) {
+                const slotCenterX = slot.col * tileW + tileW / 2;
+                if (Math.abs(player.targetX - slotCenterX) < tileW * 0.85) {
+                    landedSlot = slot;
+                    break;
+                }
+            }
+
+            if (landedSlot && !landedSlot.occupied) {
+                landedSlot.occupied = true;
+                score += 150 * level;
+                sound.playDock();
+                createExplosion(player.targetX, tileH / 2, '#38bdf8', 25);
+                updateHUD();
+
+                if (goalSlots.every(s => s.occupied)) {
+                    sound.playLevelUp();
+                    score += 400 * level;
+                    if (score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('immuneHighScore', highScore);
+                    }
+                    gameState = 'LEVEL_UP';
+                    setTimeout(showLevelUpScreen, 400);
+                } else {
+                    resetPlayer();
+                }
+            } else {
+                handlePlayerDeath('¡Cuidado! Apunta directo a un nódulo linfático vacío.');
+            }
+        }
+
+        function handlePlayerDeath(msg) {
+            if (player.invulnerable > 0) return;
+
+            sound.playHit();
+            createExplosion(player.x, player.y, '#fb7185', 22);
+            lives--;
+            updateHUD();
+
+            if (lives <= 0) {
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('immuneHighScore', highScore);
+                }
+                gameState = 'GAME_OVER';
+                showGameOverScreen(msg);
+            } else {
+                resetPlayer();
+            }
+        }
+
+        function update() {
+            player.pulse += 0.1;
+            if (player.invulnerable > 0) player.invulnerable--;
+
+            player.x += (player.targetX - player.x) * 0.35;
+            player.y += (player.targetY - player.y) * 0.35;
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.03;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            if (gameState !== 'PLAYING') return;
+
+            for (const lane of lanes) {
+                if (lane.speed === 0) continue;
+                for (const item of lane.items) {
+                    item.x += lane.speed;
+                    if (lane.speed > 0 && item.x > canvas.width) {
+                        item.x = -item.width;
+                    } else if (lane.speed < 0 && item.x + item.width < 0) {
+                        item.x = canvas.width;
+                    }
+                }
+            }
+
+            const currentLane = lanes.find(l => l.row === player.row);
+            if (!currentLane) return;
+
+            if (currentLane.type === 'ROAD') {
+                const hitRadius = tileW * 0.25;
+                for (const item of currentLane.items) {
+                    if (player.x + hitRadius > item.x + 6 && player.x - hitRadius < item.x + item.width - 6) {
+                        handlePlayerDeath('¡Chocaste contra un patógeno invasor!');
+                        return;
+                    }
+                }
+            } else if (currentLane.type === 'RIVER') {
+                let onRaft = false;
+                for (const raft of currentLane.items) {
+                    if (player.x >= raft.x - 4 && player.x <= raft.x + raft.width + 4) {
+                        onRaft = true;
+                        player.x += currentLane.speed;
+                        player.targetX += currentLane.speed;
+                        player.col = Math.round((player.targetX - tileW / 2) / tileW);
+                        break;
+                    }
+                }
+
+                if (!onRaft) {
+                    handlePlayerDeath('¡Caíste al fluido inflamatorio sin balsa!');
+                    return;
+                }
+
+                if (player.x < tileW * 0.2 || player.x > canvas.width - tileW * 0.2) {
+                    handlePlayerDeath('¡La corriente te arrastró fuera de la zona!');
+                    return;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const currentMap = MAPS[currentMapIndex] || MAPS[0];
+
+            for (const lane of lanes) {
+                const y = lane.row * tileH;
+                if (lane.type === 'GOAL') {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(0, y, canvas.width, tileH);
+                    for (const slot of goalSlots) {
+                        const sx = slot.col * tileW;
+                        ctx.fillStyle = slot.occupied ? 'rgba(56, 189, 248, 0.35)' : 'rgba(16, 185, 129, 0.25)';
+                        ctx.beginPath();
+                        ctx.roundRect(sx + 6, y + 6, tileW - 12, tileH - 12, 10);
+                        ctx.fill();
+                        ctx.strokeStyle = slot.occupied ? '#38bdf8' : '#34d399';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        ctx.fillStyle = slot.occupied ? '#38bdf8' : '#34d399';
+                        ctx.font = 'bold 11px Rajdhani';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(slot.occupied ? 'ACTIVADA' : 'NÓDULO', sx + tileW / 2, y + tileH / 2 + 4);
+                    }
+                } else if (lane.type === 'RIVER') {
+                    ctx.fillStyle = currentMap.bgRiver;
+                    ctx.fillRect(0, y, canvas.width, tileH);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(0, y, canvas.width, tileH);
+                } else if (lane.type === 'SAFE' || lane.type === 'START') {
+                    ctx.fillStyle = '#132a2e';
+                    ctx.fillRect(0, y, canvas.width, tileH);
+                    ctx.strokeStyle = currentMap.themeColor + '55';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(1, y + 1, canvas.width - 2, tileH - 2);
+                } else if (lane.type === 'ROAD') {
+                    ctx.fillStyle = currentMap.bgRoad;
+                    ctx.fillRect(0, y, canvas.width, tileH);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                    ctx.setLineDash([8, 8]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, y + tileH);
+                    ctx.lineTo(canvas.width, y + tileH);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                for (const item of lane.items) {
+                    if (item.type === 'RAFT') {
+                        ctx.fillStyle = '#0ea5e9';
+                        ctx.beginPath();
+                        ctx.roundRect(item.x + 2, y + 8, item.width - 4, tileH - 16, 12);
+                        ctx.fill();
+                        ctx.strokeStyle = '#bae6fd';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    } else {
+                        const cx = item.x + item.width / 2;
+                        const cy = y + tileH / 2;
+                        const rx = item.width * 0.42;
+                        const ry = tileH * 0.32;
+
+                        ctx.fillStyle = `hsl(${item.hue}, 80%, 50%)`;
+                        ctx.beginPath();
+                        ctx.roundRect(cx - rx, cy - ry, rx * 2, ry * 2, 14);
+                        ctx.fill();
+                        ctx.strokeStyle = `hsl(${item.hue}, 95%, 75%)`;
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#fff';
+                        ctx.beginPath();
+                        ctx.arc(cx - 5, cy - 2, 3, 0, Math.PI * 2);
+                        ctx.arc(cx + 5, cy - 2, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            if (gameState === 'PLAYING' || gameState === 'LEVEL_UP') {
+                if (player.invulnerable % 6 < 3) {
+                    drawDendriticCell(player.x, player.y);
+                }
+            }
+
+            for (const p of particles) {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        function drawDendriticCell(x, y) {
+            const radius = Math.min(tileW, tileH) * 0.34;
+            ctx.save();
+            ctx.translate(x, y);
+
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 6; i++) {
+                const angle = (i * Math.PI * 2) / 6 + Math.sin(player.pulse + i) * 0.15;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * (radius + 6), Math.sin(angle) * (radius + 6));
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#0284c7';
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#bae6fd';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-4, -2, 3, 0, Math.PI * 2);
+            ctx.arc(4, -2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // --- Pantallas y Modales ---
+        function showStartScreen() {
+            overlayScreen.classList.remove('hidden');
+            overlayContent.innerHTML = `
+                <div class="text-4xl mb-2">🦠</div>
+                <h2 class="text-lg sm:text-xl font-arcade text-cyan-400 mb-3">CRUCE INMUNITARIO</h2>
+                <p class="text-gray-300 text-xs sm:text-sm mb-4 leading-relaxed">
+                    Guía a la <span class="text-cyan-400 font-bold">Célula Dendrítica</span> por distintos mapas del cuerpo. Esquiva bacterias rápidas y salta sobre balsas celulares hacia los 3 nódulos superiores.
+                </p>
+                <div class="bg-slate-900 border border-slate-700 px-4 py-2 rounded-lg mb-4 text-xs font-arcade text-yellow-400">
+                    RÉCORD: ${highScore.toString().padStart(4, '0')}
+                </div>
+                <button id="startBtn" class="btn-retro px-8 py-3 rounded-xl font-arcade text-xs sm:text-sm text-white uppercase tracking-wider cursor-pointer">
+                    ▶ JUGAR AHORA
+                </button>
+            `;
+            document.getElementById('startBtn').onclick = startNewGame;
+        }
+
+        function showLevelUpScreen() {
+            const nextMap = MAPS[level % MAPS.length];
+            overlayScreen.classList.remove('hidden');
+            overlayContent.innerHTML = `
+                <div class="text-4xl mb-2">🎉</div>
+                <h2 class="text-lg sm:text-xl font-arcade text-emerald-400 mb-2">¡MAPA COMPLETADO!</h2>
+                <p class="text-gray-300 text-xs sm:text-sm mb-3">
+                    Preparando el siguiente sector: <br>
+                    <span class="font-bold text-base" style="color:${nextMap.themeColor}">${nextMap.name}</span>
+                </p>
+                <div class="bg-slate-900 border border-emerald-500/30 p-3 rounded-xl mb-4 text-xs text-left w-full">
+                    <p class="text-yellow-400 font-bold">⚡ Dificultad aumentada (+35%)</p>
+                    <p class="text-gray-400 mt-1">Puntuación actual: <span class="text-white font-bold">${score}</span></p>
+                </div>
+                <button id="nextLevelBtn" class="btn-retro px-8 py-3 rounded-xl font-arcade text-xs sm:text-sm text-white uppercase tracking-wider cursor-pointer">
+                    SIGUIENTE NIVEL ►
+                </button>
+            `;
+            document.getElementById('nextLevelBtn').onclick = startNextLevel;
+        }
+
+        function showGameOverScreen(reason) {
+            overlayScreen.classList.remove('hidden');
+            overlayContent.innerHTML = `
+                <div class="text-4xl mb-2">💥</div>
+                <h2 class="text-lg sm:text-xl font-arcade text-rose-500 mb-2">INFECCIÓN AVANZADA</h2>
+                <p class="text-gray-300 text-xs sm:text-sm mb-4">${reason}</p>
+                <div class="bg-slate-900 border border-slate-700 px-4 py-3 rounded-xl mb-5 text-xs font-arcade flex flex-col gap-2 w-full">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">NIVEL:</span>
+                        <span class="text-cyan-400">${level}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">PUNTOS:</span>
+                        <span class="text-yellow-400">${score}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">RÉCORD:</span>
+                        <span class="text-emerald-400">${highScore}</span>
+                    </div>
+                </div>
+                <button id="retryBtn" class="btn-retro px-8 py-3 rounded-xl font-arcade text-xs sm:text-sm text-white uppercase tracking-wider cursor-pointer">
+                    ↻ VOLVER A INTENTAR
+                </button>
+            `;
+            document.getElementById('retryBtn').onclick = startNewGame;
+        }
+
+        function startNewGame() {
+            sound.init();
+            score = 0;
+            level = 1;
+            lives = 3;
+            goalSlots.forEach(s => s.occupied = false);
+            initLanes();
+            resetPlayer();
+            gameState = 'PLAYING';
+            overlayScreen.classList.add('hidden');
+        }
+
+        function startNextLevel() {
+            sound.init();
+            level++;
+            goalSlots.forEach(s => s.occupied = false);
+            initLanes();
+            resetPlayer();
+            gameState = 'PLAYING';
+            overlayScreen.classList.add('hidden');
+        }
+
+        // --- Eventos de Controles ---
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                e.preventDefault();
+            }
+            if (gameState === 'PLAYING') {
+                if (e.code === 'ArrowUp' || e.code === 'KeyW') movePlayer(0, -1);
+                if (e.code === 'ArrowDown' || e.code === 'KeyS') movePlayer(0, 1);
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') movePlayer(-1, 0);
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') movePlayer(1, 0);
+            }
+        });
+
+        document.getElementById('btnUp').addEventListener('click', () => movePlayer(0, -1));
+        document.getElementById('btnDown').addEventListener('click', () => movePlayer(0, 1));
+        document.getElementById('btnLeft').addEventListener('click', () => movePlayer(-1, 0));
+        document.getElementById('btnRight').addEventListener('click', () => movePlayer(1, 0));
+
+        document.getElementById('soundToggleBtn').addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            document.getElementById('soundToggleBtn').innerText = sound.enabled ? '🔊 ON' : '🔇 OFF';
+        });
+
+        // Gestos Táctiles (Swipe)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', (e) => {
+            const dx = e.changedTouches[0].screenX - touchStartX;
+            const dy = e.changedTouches[0].screenY - touchStartY;
+            if (Math.abs(dx) > 25 || Math.abs(dy) > 25) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    movePlayer(dx > 0 ? 1 : -1, 0);
+                } else {
+                    movePlayer(0, dy > 0 ? 1 : -1);
+                }
+            }
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            initLanes();
+        });
+
+        // --- Bucle Principal ---
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        window.onload = function() {
+            resizeCanvas();
+            initLanes();
+            resetPlayer();
+            showStartScreen();
+            loop();
+        };
+    </script>
+</body>
+</html>
